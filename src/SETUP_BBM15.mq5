@@ -3,7 +3,7 @@
 //| Indicateur MT5 - detection de setup ICT                         |
 //+------------------------------------------------------------------+
 #property copyright "SETUP_BBM15"
-#property version   "1.001"
+#property version   "1.002"
 #property indicator_chart_window
 #property indicator_plots 0
 
@@ -20,6 +20,7 @@ input bool   InpPopupAlert = true;               // Alerte popup MT5
 input bool   InpSoundAlert = true;               // Alerte sonore
 input string InpAlertSound = "alert.wav";        // Fichier son MT5
 input bool   InpDrawZones = true;                // Dessiner les zones sur le graphique courant
+input int    InpZoneEndAfterAlertBars = 1;       // Fin de zone BB apres la bougie de pullback
 input int    InpScanEverySeconds = 10;           // Frequence de scan
 
 struct SetupSignal
@@ -322,7 +323,7 @@ void DrawSignal(const SetupSignal &signal)
    if(signal.symbol != _Symbol)
       return;
 
-   datetime right_time = TimeCurrent() + (datetime)(PeriodSeconds(PERIOD_M15) * 20);
+   datetime right_time = signal.alert_time + (datetime)(PeriodSeconds(PERIOD_M15) * MathMax(0, InpZoneEndAfterAlertBars));
    string prefix = "SETUP_BBM15_" + signal.symbol + "_" + IntegerToString((long)signal.ob_start_time) + "_";
 
    DrawRectangle(prefix + "BB", signal.ob_start_time, signal.ob_high, right_time, signal.ob_low, clrDodgerBlue, true);
