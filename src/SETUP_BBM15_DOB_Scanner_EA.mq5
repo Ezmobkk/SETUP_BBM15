@@ -3,14 +3,16 @@
 //| Scanner MT5 sans trading automatique base sur un indicateur DOB   |
 //+------------------------------------------------------------------+
 #property copyright "SETUP_BBM15"
-#property version   "1.102"
+#property version   "1.103"
 #property strict
 
 input string InpSymbols = "";                         // Actifs a scanner, separes par virgule. Vide = actif du graphique
 input int    InpLookbackBars = 300;                   // Nombre de bougies M15 analysees
-input string InpDobIndicatorName = "DisplacementOrderBlock"; // Nom de l'indicateur OB installe dans MQL5/Indicators
-input bool   InpDobDebugEnabled = false;              // Logs de l'indicateur DOB
-input bool   InpScanBullishDob = true;                // Scanner DOB bullish: cassure dessous, retour sur le bas
+input bool   InpUseH1BearishTrendFilter = true;       // Filtrer uniquement si la tendance H1 est baissiere
+input int    InpH1TrendLookbackBars = 20;             // Nombre de bougies H1 pour definir la tendance
+input int    InpMaxOrderBlockCandles = 5;             // Nombre maximum de bougies haussieres dans l'OB bearish
+input double InpMinSibiPoints = 0.0;                  // Taille minimale de la SIBI en points
+input bool   InpScanBullishDob = false;               // Scanner DOB bullish: desactive pour cette version de test
 input bool   InpScanBearishDob = true;                // Scanner DOB bearish: cassure dessus, retour sur le haut
 input bool   InpBreakRequiresClose = true;            // Cassure validee par cloture hors zone OB
 input bool   InpAlertOnCurrentCandle = true;          // Alerte intrabougie, sinon bougie cloturee
@@ -49,7 +51,6 @@ int OnInit()
 {
    EventSetTimer(MathMax(1, InpScanEverySeconds));
    Print("SETUP_BBM15 DOB Scanner EA demarre. Aucun trade automatique n'est execute.");
-   Print("Indicateur DOB attendu dans MQL5/Indicators: ", InpDobIndicatorName);
    DrawHistoricalArrows();
    ScanAllSymbols();
    return(INIT_SUCCEEDED);
@@ -140,6 +141,9 @@ bool FindBullishBreakerPullbackAt(const string symbol, const int alert_index, Se
    if(!SymbolSelect(symbol, true))
       return(false);
 
+   if(!InpScanBearishDob)
+      return(false);
+
    MqlRates rates[];
    ArraySetAsSeries(rates, true);
 
@@ -148,134 +152,154 @@ bool FindBullishBreakerPullbackAt(const string symbol, const int alert_index, Se
    if(copied < 20 || alert_index >= copied)
       return(false);
 
-   double dob_highs[];
-   double dob_lows[];
-   double dob_trends[];
-   if(!CopyDobBuffers(symbol, copied, dob_highs, dob_lows, dob_trends))
+   if(InpUseH1BearishTrendFilter && !IsH1BearishTrend(symbol, rates[alert_index].time))
       return(false);
 
-   for(int ob_index = alert_index + 3; ob_index < copied - 3; ob_index++)
+   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   if(point <= 0.0)
+      point = 0.00001;
+
+   double min_gap = InpMinSibiPoints * point;
+   bool has_selected = false;
+   SetupSignal selected;
+
+   for(int sibi_index = alert_index + 2; sibi_index < copied - 3; sibi_index++)
    {
-      int direction = DobDirection(dob_trends[ob_index]);
-      if(direction == 0)
+      int first_candle = sibi_index + 2;
+      int third_candle = sibi_index;
+
+      if(!IsBearishSibi(rates, first_candle, third_candle, min_gap))
          continue;
 
-      if(direction > 0 && !InpScanBullishDob)
-         continue;
-
-      if(direction < 0 && !InpScanBearishDob)
+      if(!IsBullish(rates[first_candle]))
          continue;
 
       double ob_low = 0.0;
       double ob_high = 0.0;
-      if(!NormalizeDobZone(dob_highs[ob_index], dob_lows[ob_index], ob_low, ob_high))
+      int ob_oldest = first_candle;
+      int ob_newest = first_candle;
+      if(!BuildBearishObZone(rates, copied, first_candle, ob_low, ob_high, ob_oldest, ob_newest))
          continue;
 
-      double alert_level = direction > 0 ? ob_low : ob_high;
-      int break_index = FindBreakIndex(rates, ob_index - 1, alert_index + 1, direction, ob_low, ob_high);
+      int break_index = FindBreakIndex(rates, sibi_index - 1, alert_index + 1, -1, ob_low, ob_high);
       if(break_index < 0)
          continue;
 
       if(alert_index >= break_index)
          continue;
 
+      double alert_level = ob_high;
       if(!TouchesLevel(rates[alert_index], alert_level))
          continue;
 
       if(InpFirstPullbackOnly && HasEarlierLevelTouch(rates, break_index - 1, alert_index + 1, alert_level))
          continue;
 
-      signal.symbol = symbol;
-      signal.direction = direction;
-      signal.ob_time = rates[ob_index].time;
-      signal.ob_low = ob_low;
-      signal.ob_high = ob_high;
-      signal.break_time = rates[break_index].time;
-      signal.alert_time = rates[alert_index].time;
-      signal.alert_price = alert_level;
-      return(true);
+      SetupSignal candidate;
+      candidate.symbol = symbol;
+      candidate.direction = -1;
+      candidate.ob_time = rates[ob_newest].time;
+      candidate.ob_low = ob_low;
+      candidate.ob_high = ob_high;
+      candidate.break_time = rates[break_index].time;
+      candidate.alert_time = rates[alert_index].time;
+      candidate.alert_price = alert_level;
+
+      if(!has_selected)
+      {
+         selected = candidate;
+         has_selected = true;
+         continue;
+      }
+
+      if(ZonesOverlap(selected.ob_low, selected.ob_high, candidate.ob_low, candidate.ob_high))
+      {
+         if(ZoneHeight(candidate.ob_low, candidate.ob_high) > ZoneHeight(selected.ob_low, selected.ob_high))
+            selected = candidate;
+      }
    }
 
-   return(false);
-}
-
-//+------------------------------------------------------------------+
-int DobDirection(const double trend)
-{
-   if(trend > 0.5)
-      return(1);
-
-   if(trend < -0.5)
-      return(-1);
-
-   return(0);
-}
-
-//+------------------------------------------------------------------+
-bool CopyDobBuffers(const string symbol,
-                    const int bars_count,
-                    double &dob_highs[],
-                    double &dob_lows[],
-                    double &dob_trends[])
-{
-   ArraySetAsSeries(dob_highs, true);
-   ArraySetAsSeries(dob_lows, true);
-   ArraySetAsSeries(dob_trends, true);
-
-   int handle = iCustom(symbol,
-                        PERIOD_M15,
-                        InpDobIndicatorName,
-                        InpDobDebugEnabled,
-                        false,
-                        false,
-                        clrLightPink,
-                        clrLightGreen,
-                        false,
-                        STYLE_SOLID,
-                        1);
-
-   if(handle == INVALID_HANDLE)
-   {
-      Print("Impossible de charger l'indicateur DOB: ", InpDobIndicatorName, " pour ", symbol);
+   if(!has_selected)
       return(false);
-   }
 
-   int copied_high = CopyBuffer(handle, 0, 0, bars_count, dob_highs);
-   int copied_low = CopyBuffer(handle, 1, 0, bars_count, dob_lows);
-   int copied_trend = CopyBuffer(handle, 2, 0, bars_count, dob_trends);
-   IndicatorRelease(handle);
-
-   if(copied_high < bars_count || copied_low < bars_count || copied_trend < bars_count)
-   {
-      Print("Buffers DOB incomplets pour ", symbol, ". Verifie que l'indicateur est installe et compile.");
-      return(false);
-   }
-
+   signal = selected;
    return(true);
 }
 
 //+------------------------------------------------------------------+
-bool NormalizeDobZone(const double buffer_a, const double buffer_b, double &ob_low, double &ob_high)
+bool IsH1BearishTrend(const string symbol, const datetime when)
 {
-   if(!IsUsablePrice(buffer_a) || !IsUsablePrice(buffer_b))
+   int lookback = MathMax(2, InpH1TrendLookbackBars);
+   int shift = iBarShift(symbol, PERIOD_H1, when, false);
+   if(shift < 0)
       return(false);
 
-   ob_low = MathMin(buffer_a, buffer_b);
-   ob_high = MathMax(buffer_a, buffer_b);
+   int newest_closed = shift + 1;
+   int oldest = newest_closed + lookback - 1;
 
-   return(ob_high > ob_low);
+   if(Bars(symbol, PERIOD_H1) <= oldest)
+      return(false);
+
+   double newest_close = iClose(symbol, PERIOD_H1, newest_closed);
+   double oldest_close = iClose(symbol, PERIOD_H1, oldest);
+
+   if(newest_close <= 0.0 || oldest_close <= 0.0)
+      return(false);
+
+   return(newest_close < oldest_close);
 }
 
 //+------------------------------------------------------------------+
-bool IsUsablePrice(const double value)
+bool IsBullish(const MqlRates &bar)
 {
-   if(value == EMPTY_VALUE || value <= 0.0)
-      return(false);
+   return(bar.close > bar.open);
+}
 
-   if(value > DBL_MAX / 4.0)
-      return(false);
+//+------------------------------------------------------------------+
+bool IsBearishSibi(const MqlRates &rates[], const int first_candle, const int third_candle, const double min_gap)
+{
+   return(rates[first_candle].low > rates[third_candle].high + min_gap);
+}
 
-   return(MathIsValidNumber(value));
+//+------------------------------------------------------------------+
+bool BuildBearishObZone(const MqlRates &rates[],
+                        const int copied,
+                        const int first_candle,
+                        double &ob_low,
+                        double &ob_high,
+                        int &ob_oldest,
+                        int &ob_newest)
+{
+   ob_low = DBL_MAX;
+   ob_high = -DBL_MAX;
+   ob_oldest = first_candle;
+   ob_newest = first_candle;
+
+   int count = 0;
+   for(int ob_index = first_candle; ob_index < copied && count < InpMaxOrderBlockCandles; ob_index++)
+   {
+      if(!IsBullish(rates[ob_index]))
+         break;
+
+      ob_low = MathMin(ob_low, rates[ob_index].low);
+      ob_high = MathMax(ob_high, rates[ob_index].high);
+      ob_oldest = ob_index;
+      count++;
+   }
+
+   return(count > 0 && ob_low != DBL_MAX && ob_high != -DBL_MAX && ob_high > ob_low);
+}
+
+//+------------------------------------------------------------------+
+bool ZonesOverlap(const double low_a, const double high_a, const double low_b, const double high_b)
+{
+   return(MathMax(low_a, low_b) <= MathMin(high_a, high_b));
+}
+
+//+------------------------------------------------------------------+
+double ZoneHeight(const double low_price, const double high_price)
+{
+   return(MathAbs(high_price - low_price));
 }
 
 //+------------------------------------------------------------------+
@@ -293,7 +317,7 @@ int FindBreakIndex(const MqlRates &rates[],
       if(direction > 0)
          broken = InpBreakRequiresClose ? (rates[i].close < ob_low) : (rates[i].low < ob_low);
       else if(direction < 0)
-         broken = InpBreakRequiresClose ? (rates[i].close > ob_high) : (rates[i].high > ob_high);
+         broken = (rates[i].close > ob_high);
 
       if(broken)
          return(i);
