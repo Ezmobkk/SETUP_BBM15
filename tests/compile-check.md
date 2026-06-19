@@ -33,11 +33,15 @@ Resultat :
 - Fichier compile genere localement : `src/DisplacementOrderBlock.ex5`
 
 - Fichier EA : `src/SETUP_BBM15_DOB_Scanner_EA.mq5`
-- Type : Expert Advisor scanner, sans trading automatique, base sur les buffers DOB
-- Version actuelle : 1.102
+- Type : Expert Advisor scanner, sans trading automatique, detection stricte OB bearish/SIBI
+- Version actuelle : 1.103
 - Options ajoutees :
   - scanner separement les DOB bullish et les DOB bearish
   - dessiner le rectangle DOB associe a chaque alerte
+  - filtrer uniquement les tendances H1 baissieres sur 20 bougies
+  - detecter les OB bearish M15 comme bougie(s) haussiere(s) avant SIBI
+  - garder le plus large lorsque deux OB se chevauchent
+  - exiger une cassure cloturee au-dessus du haut de l'OB bearish
 - Resultat compilation EA : 0 erreur, 0 avertissement
 - Fichier compile genere localement : `src/SETUP_BBM15_DOB_Scanner_EA.ex5`
 
