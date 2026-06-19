@@ -3,14 +3,16 @@
 //| Scanner MT5 sans trading automatique base sur un indicateur DOB   |
 //+------------------------------------------------------------------+
 #property copyright "SETUP_BBM15"
-#property version   "1.100"
+#property version   "1.101"
 #property strict
 
 input string InpSymbols = "";                         // Actifs a scanner, separes par virgule. Vide = actif du graphique
 input int    InpLookbackBars = 300;                   // Nombre de bougies M15 analysees
 input string InpDobIndicatorName = "DisplacementOrderBlock"; // Nom de l'indicateur OB installe dans MQL5/Indicators
 input bool   InpDobDebugEnabled = false;              // Logs de l'indicateur DOB
-input bool   InpBreakRequiresClose = true;            // Cassure validee par cloture sous le bas de l'OB
+input bool   InpScanBullishDob = true;                // Scanner DOB bullish: cassure dessous, retour sur le bas
+input bool   InpScanBearishDob = true;                // Scanner DOB bearish: cassure dessus, retour sur le haut
+input bool   InpBreakRequiresClose = true;            // Cassure validee par cloture hors zone OB
 input bool   InpAlertOnCurrentCandle = true;          // Alerte intrabougie, sinon bougie cloturee
 input bool   InpFirstPullbackOnly = true;             // Alerter uniquement le premier retour dans le BB
 input bool   InpOneAlertPerBreaker = true;            // Une seule alerte par breaker block
@@ -27,6 +29,7 @@ input int    InpScanEverySeconds = 10;                // Frequence de scan
 struct SetupSignal
 {
    string   symbol;
+   int      direction;
    datetime ob_time;
    double   ob_low;
    double   ob_high;
@@ -149,7 +152,14 @@ bool FindBullishBreakerPullbackAt(const string symbol, const int alert_index, Se
 
    for(int ob_index = alert_index + 3; ob_index < copied - 3; ob_index++)
    {
-      if(dob_trends[ob_index] < 0.5)
+      int direction = DobDirection(dob_trends[ob_index]);
+      if(direction == 0)
+         continue;
+
+      if(direction > 0 && !InpScanBullishDob)
+         continue;
+
+      if(direction < 0 && !InpScanBearishDob)
          continue;
 
       double ob_low = 0.0;
@@ -157,30 +167,44 @@ bool FindBullishBreakerPullbackAt(const string symbol, const int alert_index, Se
       if(!NormalizeDobZone(dob_highs[ob_index], dob_lows[ob_index], ob_low, ob_high))
          continue;
 
-      int break_index = FindBreakIndex(rates, ob_index - 1, alert_index + 1, ob_low);
+      double alert_level = direction > 0 ? ob_low : ob_high;
+      int break_index = FindBreakIndex(rates, ob_index - 1, alert_index + 1, direction, ob_low, ob_high);
       if(break_index < 0)
          continue;
 
       if(alert_index >= break_index)
          continue;
 
-      if(!TouchesBreakerBottom(rates[alert_index], ob_low))
+      if(!TouchesLevel(rates[alert_index], alert_level))
          continue;
 
-      if(InpFirstPullbackOnly && HasEarlierBottomTouch(rates, break_index - 1, alert_index + 1, ob_low))
+      if(InpFirstPullbackOnly && HasEarlierLevelTouch(rates, break_index - 1, alert_index + 1, alert_level))
          continue;
 
       signal.symbol = symbol;
+      signal.direction = direction;
       signal.ob_time = rates[ob_index].time;
       signal.ob_low = ob_low;
       signal.ob_high = ob_high;
       signal.break_time = rates[break_index].time;
       signal.alert_time = rates[alert_index].time;
-      signal.alert_price = ob_low;
+      signal.alert_price = alert_level;
       return(true);
    }
 
    return(false);
+}
+
+//+------------------------------------------------------------------+
+int DobDirection(const double trend)
+{
+   if(trend > 0.5)
+      return(1);
+
+   if(trend < -0.5)
+      return(-1);
+
+   return(0);
 }
 
 //+------------------------------------------------------------------+
@@ -251,11 +275,22 @@ bool IsUsablePrice(const double value)
 }
 
 //+------------------------------------------------------------------+
-int FindBreakIndex(const MqlRates &rates[], const int from_index, const int to_index, const double ob_low)
+int FindBreakIndex(const MqlRates &rates[],
+                   const int from_index,
+                   const int to_index,
+                   const int direction,
+                   const double ob_low,
+                   const double ob_high)
 {
    for(int i = from_index; i >= to_index; i--)
    {
-      bool broken = InpBreakRequiresClose ? (rates[i].close < ob_low) : (rates[i].low < ob_low);
+      bool broken = false;
+
+      if(direction > 0)
+         broken = InpBreakRequiresClose ? (rates[i].close < ob_low) : (rates[i].low < ob_low);
+      else if(direction < 0)
+         broken = InpBreakRequiresClose ? (rates[i].close > ob_high) : (rates[i].high > ob_high);
+
       if(broken)
          return(i);
    }
@@ -264,17 +299,17 @@ int FindBreakIndex(const MqlRates &rates[], const int from_index, const int to_i
 }
 
 //+------------------------------------------------------------------+
-bool TouchesBreakerBottom(const MqlRates &bar, const double ob_low)
+bool TouchesLevel(const MqlRates &bar, const double level)
 {
-   return(bar.high >= ob_low && bar.low <= ob_low);
+   return(bar.high >= level && bar.low <= level);
 }
 
 //+------------------------------------------------------------------+
-bool HasEarlierBottomTouch(const MqlRates &rates[], const int from_index, const int to_index, const double ob_low)
+bool HasEarlierLevelTouch(const MqlRates &rates[], const int from_index, const int to_index, const double level)
 {
    for(int i = from_index; i >= to_index; i--)
    {
-      if(TouchesBreakerBottom(rates[i], ob_low))
+      if(TouchesLevel(rates[i], level))
          return(true);
    }
 
@@ -322,7 +357,8 @@ void ClearHistoricalArrows()
 //+------------------------------------------------------------------+
 string BuildAlertKey(const SetupSignal &signal)
 {
-   string base = signal.symbol + "|DOB_BB_BOTTOM|" + IntegerToString((long)signal.ob_time) + "|" + IntegerToString((long)signal.break_time);
+   string side = signal.direction > 0 ? "BULLISH_DOB_BB_BOTTOM" : "BEARISH_DOB_BB_TOP";
+   string base = signal.symbol + "|" + side + "|" + IntegerToString((long)signal.ob_time) + "|" + IntegerToString((long)signal.break_time);
 
    if(InpOneAlertPerBreaker)
       return(base);
@@ -353,9 +389,11 @@ void RegisterAlert(const string key)
 //+------------------------------------------------------------------+
 void SendSetupAlert(const SetupSignal &signal)
 {
+   string side = signal.direction > 0 ? "DOB bullish casse dessous, pullback sur le bas" : "DOB bearish casse dessus, pullback sur le haut";
    string message = StringFormat(
-      "SETUP_BBM15 DOB Scanner | %s | M15 | Pullback touche le bas du Breaker Block bullish | Prix %.5f",
+      "SETUP_BBM15 DOB Scanner | %s | M15 | %s | Prix %.5f",
       signal.symbol,
+      side,
       signal.alert_price
    );
 
@@ -392,7 +430,8 @@ void DrawAlertArrow(const SetupSignal &signal, const bool historical)
    string label = name + "_TEXT";
    ObjectDelete(0, label);
    ObjectCreate(0, label, OBJ_TEXT, 0, signal.alert_time, signal.alert_price);
-   ObjectSetString(0, label, OBJPROP_TEXT, historical ? "DOB BB hist" : "DOB BB alert");
+   string side = signal.direction > 0 ? "bull" : "bear";
+   ObjectSetString(0, label, OBJPROP_TEXT, historical ? "DOB " + side + " hist" : "DOB " + side + " alert");
    ObjectSetInteger(0, label, OBJPROP_COLOR, InpArrowColor);
    ObjectSetInteger(0, label, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
 }
