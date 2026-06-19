@@ -45,6 +45,8 @@ L'alerte ne doit pas se declencher au moment de la cassure.
 Elle doit se declencher uniquement lorsque le pullback revient toucher ou atteindre la zone du breaker block.
 Par defaut, l'indicateur doit alerter uniquement sur le premier retour dans la zone BB apres la cassure.
 Si le prix a deja retouche la zone apres la cassure, les retours suivants ne doivent pas generer une nouvelle alerte pour le meme breaker block.
+Visuellement, la zone BB dessinee sur le graphique doit s'arreter juste apres la bougie du pullback qui declenche l'alerte.
+Elle ne doit pas continuer vers la droite apres ce premier pullback.
 
 Dans l'exemple DAX M15 fourni :
 
