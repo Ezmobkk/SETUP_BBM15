@@ -3,7 +3,7 @@
 //| Indicateur MT5 - detection de setup ICT                         |
 //+------------------------------------------------------------------+
 #property copyright "SETUP_BBM15"
-#property version   "1.000"
+#property version   "1.001"
 #property indicator_chart_window
 #property indicator_plots 0
 
@@ -14,6 +14,7 @@ input double InpMinFvgPoints = 0.0;              // Taille minimale du BISI en p
 input bool   InpUseWicksForObZone = true;        // Zone OB avec meches completes, sinon corps
 input bool   InpBreakRequiresClose = true;       // Cassure validee par cloture sous l'OB
 input bool   InpAlertOnCurrentCandle = true;     // Alerte intrabougie, sinon bougie cloturee
+input bool   InpFirstPullbackOnly = true;        // Alerter uniquement le premier retour dans le BB
 input bool   InpOneAlertPerBreaker = true;       // Une seule alerte par breaker block
 input bool   InpPopupAlert = true;               // Alerte popup MT5
 input bool   InpSoundAlert = true;               // Alerte sonore
@@ -199,6 +200,9 @@ bool FindBullishBreakerPullback(const string symbol, SetupSignal &signal)
       if(!TouchesZone(rates[alert_index], ob_low, ob_high))
          continue;
 
+      if(InpFirstPullbackOnly && HasEarlierPullbackTouch(rates, break_index - 1, alert_index + 1, ob_low, ob_high))
+         continue;
+
       signal.symbol = symbol;
       signal.ob_start_time = rates[ob_oldest].time;
       signal.ob_end_time = rates[ob_newest].time;
@@ -245,6 +249,18 @@ int FindBreakIndex(const MqlRates &rates[], const int from_index, const int to_i
 bool TouchesZone(const MqlRates &bar, const double zone_low, const double zone_high)
 {
    return(bar.high >= zone_low && bar.low <= zone_high);
+}
+
+//+------------------------------------------------------------------+
+bool HasEarlierPullbackTouch(const MqlRates &rates[], const int from_index, const int to_index, const double zone_low, const double zone_high)
+{
+   for(int i = from_index; i >= to_index; i--)
+   {
+      if(TouchesZone(rates[i], zone_low, zone_high))
+         return(true);
+   }
+
+   return(false);
 }
 
 //+------------------------------------------------------------------+
