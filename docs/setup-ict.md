@@ -19,6 +19,16 @@ Le setup bullish a identifier est compose de deux elements :
 
 Dans ce setup, le breaker block vient d'abord d'un order block M15.
 
+### Definition de l'order block pour ce projet
+
+Pour le setup bullish, l'order block M15 correspond a la derniere bougie baissiere, ou a la derniere sequence de bougies baissieres consecutives, juste avant l'impulsion haussiere qui cree le BISI/FVG.
+
+Regle importante :
+
+- si plusieurs bougies baissieres consecutives precedent l'impulsion et le BISI, elles peuvent former une zone OB plus large ;
+- si une bougie haussiere apparait avant la derniere bougie baissiere, elle coupe la sequence et ne fait pas partie de l'OB ;
+- dans l'exemple fourni, seule la derniere bougie rouge est retenue comme OB, car la bougie precedente est haussiere.
+
 Sequence attendue :
 
 1. Un order block M15 se forme.
@@ -91,3 +101,4 @@ Pour transformer cette definition en indicateur, il faudra preciser :
 4. Ce qui confirme que l'order block est casse et devient breaker block.
 5. Si l'alerte doit se declencher au premier contact du breaker block, a l'entree dans la zone, ou a la cloture d'une bougie dans la zone.
 6. Si une alerte doit etre envoyee une seule fois par breaker block ou plusieurs fois a chaque retour du prix.
+7. Si la zone OB doit etre tracee avec les meches completes ou uniquement avec les corps des bougies.
