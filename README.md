@@ -32,6 +32,14 @@ Il peut tourner en arriere-plan et surveiller une liste d'actifs definie manuell
 4. Attacher `SETUP_BBM15_DOB_Scanner_EA` sur un graphique.
 
 Cette variante ne passe aucun ordre. Elle utilise l'indicateur DOB pour reperer les OB, puis l'EA cherche la cassure inverse et le pullback sur le bas du breaker block.
+Depuis la version 1.101, elle peut scanner les deux sens :
+
+- DOB bullish : cassure sous le bas de l'OB, puis pullback sur le bas du breaker block.
+- DOB bearish : cassure au-dessus du haut de l'OB, puis pullback sur le haut du breaker block.
+
+Les options `InpScanBullishDob` et `InpScanBearishDob` permettent d'activer ou desactiver chaque sens.
+
+L'indicateur `DisplacementOrderBlock` peut aussi etre installe seul sur un graphique MT5 pour verifier visuellement les zones DOB detectees.
 
 ## Source externe
 
