@@ -39,6 +39,13 @@ Depuis la version 1.101, elle peut scanner les deux sens :
 
 Les options `InpScanBullishDob` et `InpScanBearishDob` permettent d'activer ou desactiver chaque sens.
 
+Depuis la version 1.102, chaque alerte peut aussi afficher la zone DOB associee :
+
+- rectangle vert non rempli pour un DOB bullish.
+- rectangle rouge non rempli pour un DOB bearish.
+
+L'option `InpDrawDobZoneOnChart` controle cet affichage.
+
 L'indicateur `DisplacementOrderBlock` peut aussi etre installe seul sur un graphique MT5 pour verifier visuellement les zones DOB detectees.
 
 ## Source externe
