@@ -20,4 +20,19 @@ Il peut tourner en arriere-plan et surveiller une liste d'actifs definie manuell
 ## Fichiers principaux
 
 - `src/SETUP_BBM15_Scanner_EA.mq5` : scanner multi-actifs sans trading automatique.
+- `src/SETUP_BBM15_DOB_Scanner_EA.mq5` : nouvelle variante EA qui lit l'indicateur `DisplacementOrderBlock`.
+- `src/DisplacementOrderBlock.mq5` : indicateur DOB/OB externe utilise par la variante DOB.
 - `src/SETUP_BBM15.mq5` : ancienne version indicateur graphique.
+
+## Installation de la variante DOB
+
+1. Copier `DisplacementOrderBlock.mq5` et `DisplacementOrderBlock.ex5` dans `MQL5/Indicators`.
+2. Copier `SETUP_BBM15_DOB_Scanner_EA.mq5` et `SETUP_BBM15_DOB_Scanner_EA.ex5` dans `MQL5/Experts`.
+3. Dans MT5, rafraichir le Navigateur.
+4. Attacher `SETUP_BBM15_DOB_Scanner_EA` sur un graphique.
+
+Cette variante ne passe aucun ordre. Elle utilise l'indicateur DOB pour reperer les OB, puis l'EA cherche la cassure inverse et le pullback sur le bas du breaker block.
+
+## Source externe
+
+`DisplacementOrderBlock.mq5` provient du projet public MIT `rpanchyk/mt5-dob-ind`.
