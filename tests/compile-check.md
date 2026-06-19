@@ -34,8 +34,10 @@ Resultat :
 
 - Fichier EA : `src/SETUP_BBM15_DOB_Scanner_EA.mq5`
 - Type : Expert Advisor scanner, sans trading automatique, base sur les buffers DOB
-- Version actuelle : 1.101
-- Option ajoutee : scanner separement les DOB bullish et les DOB bearish
+- Version actuelle : 1.102
+- Options ajoutees :
+  - scanner separement les DOB bullish et les DOB bearish
+  - dessiner le rectangle DOB associe a chaque alerte
 - Resultat compilation EA : 0 erreur, 0 avertissement
 - Fichier compile genere localement : `src/SETUP_BBM15_DOB_Scanner_EA.ex5`
 
