@@ -43,14 +43,16 @@ Apres la cassure de l'order block et sa transformation en breaker block, le prix
 
 L'alerte ne doit pas se declencher au moment de la cassure.
 Elle doit se declencher uniquement lorsque le pullback revient toucher ou atteindre la zone du breaker block.
+Par defaut, l'indicateur doit alerter uniquement sur le premier retour dans la zone BB apres la cassure.
+Si le prix a deja retouche la zone apres la cassure, les retours suivants ne doivent pas generer une nouvelle alerte pour le meme breaker block.
 
 Dans l'exemple DAX M15 fourni :
 
 - le BISI/FVG se forme apres l'impulsion haussiere ;
 - la zone du breaker block est encadree en bleu ;
 - le prix casse ensuite cette zone a la baisse avec des bougies rouges ;
-- le pullback revient ensuite dans la zone du breaker block ;
-- l'alerte doit se declencher a ce retour dans la zone BB.
+- le premier pullback revient ensuite dans la zone du breaker block ;
+- l'alerte doit se declencher a ce premier retour dans la zone BB.
 
 ### Actifs
 
@@ -84,6 +86,7 @@ A definir.
 ## Moment de declenchement de l'alerte
 
 Pour le setup bullish, l'alerte doit se declencher au moment ou le prix revient en pullback sur le breaker block M15.
+La cible par defaut est le premier contact du pullback avec la zone BB apres cassure.
 
 L'alerte attendue :
 
