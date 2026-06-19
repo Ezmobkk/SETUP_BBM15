@@ -16,6 +16,13 @@ Resultat :
 - avertissements : 0
 - fichier compile genere localement : `src/SETUP_BBM15.ex5`
 
+## Scanner EA
+
+- Fichier : `src/SETUP_BBM15_Scanner_EA.mq5`
+- Type : Expert Advisor scanner, sans trading automatique
+- Resultat compilation : 0 erreur, 0 avertissement
+- Fichier compile genere localement : `src/SETUP_BBM15_Scanner_EA.ex5`
+
 ## Notes
 
 L'installation dans le dossier `MQL5/Indicators` a ete faite manuellement.
