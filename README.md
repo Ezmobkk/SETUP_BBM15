@@ -20,8 +20,8 @@ Il peut tourner en arriere-plan et surveiller une liste d'actifs definie manuell
 ## Fichiers principaux
 
 - `src/SETUP_BBM15_Scanner_EA.mq5` : scanner multi-actifs sans trading automatique.
-- `src/SETUP_BBM15_DOB_Scanner_EA.mq5` : nouvelle variante EA qui lit l'indicateur `DisplacementOrderBlock`.
-- `src/DisplacementOrderBlock.mq5` : indicateur DOB/OB externe utilise par la variante DOB.
+- `src/SETUP_BBM15_DOB_Scanner_EA.mq5` : variante stricte OB bearish/SIBI avec filtre de tendance H1.
+- `src/DisplacementOrderBlock.mq5` : indicateur DOB/OB externe conserve pour verification visuelle.
 - `src/SETUP_BBM15.mq5` : ancienne version indicateur graphique.
 
 ## Installation de la variante DOB
@@ -31,7 +31,7 @@ Il peut tourner en arriere-plan et surveiller une liste d'actifs definie manuell
 3. Dans MT5, rafraichir le Navigateur.
 4. Attacher `SETUP_BBM15_DOB_Scanner_EA` sur un graphique.
 
-Cette variante ne passe aucun ordre. Elle utilise l'indicateur DOB pour reperer les OB, puis l'EA cherche la cassure inverse et le pullback sur le bas du breaker block.
+Cette variante ne passe aucun ordre.
 Depuis la version 1.101, elle peut scanner les deux sens :
 
 - DOB bullish : cassure sous le bas de l'OB, puis pullback sur le bas du breaker block.
@@ -45,6 +45,14 @@ Depuis la version 1.102, chaque alerte peut aussi afficher la zone DOB associee 
 - rectangle rouge non rempli pour un DOB bearish.
 
 L'option `InpDrawDobZoneOnChart` controle cet affichage.
+
+Depuis la version 1.103, le mode de test actif est beaucoup plus restrictif :
+
+- seule la tendance H1 baissiere est acceptee, mesuree sur les 20 dernieres bougies H1 cloturees.
+- seules les zones OB bearish M15 sont recherchees.
+- un OB bearish est une ou plusieurs bougies haussieres avant une SIBI.
+- la cassure du haut de l'OB doit cloturer au-dessus.
+- si deux OB se chevauchent, l'EA garde le plus large.
 
 L'indicateur `DisplacementOrderBlock` peut aussi etre installe seul sur un graphique MT5 pour verifier visuellement les zones DOB detectees.
 
