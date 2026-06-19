@@ -3,7 +3,7 @@
 //| Scanner MT5 sans trading automatique                             |
 //+------------------------------------------------------------------+
 #property copyright "SETUP_BBM15"
-#property version   "1.000"
+#property version   "1.001"
 #property strict
 
 input string InpSymbols = "";                    // Actifs a scanner, separes par virgule. Vide = actif du graphique
@@ -19,6 +19,8 @@ input bool   InpPopupAlert = true;               // Alerte popup MT5
 input bool   InpSoundAlert = true;               // Alerte sonore
 input string InpAlertSound = "alert.wav";        // Fichier son MT5
 input bool   InpDrawArrowOnChart = true;         // Dessiner une fleche sur le graphique actif
+input bool   InpDrawHistoricalArrows = true;     // Afficher les anciennes fleches sur le graphique actif
+input int    InpMaxHistoricalArrows = 50;        // Nombre maximum de fleches historiques
 input color  InpArrowColor = clrRed;             // Couleur de la fleche d'alerte
 input int    InpArrowCode = 233;                 // Code Wingdings de la fleche
 input int    InpScanEverySeconds = 10;           // Frequence de scan
@@ -46,6 +48,7 @@ int OnInit()
 {
    EventSetTimer(MathMax(1, InpScanEverySeconds));
    Print("SETUP_BBM15 Scanner EA demarre. Aucun trade automatique n'est execute.");
+   DrawHistoricalArrows();
    ScanAllSymbols();
    return(INIT_SUCCEEDED);
 }
@@ -83,7 +86,7 @@ void ScanAllSymbols()
          if(!WasAlerted(key))
          {
             RegisterAlert(key);
-            DrawAlertArrow(signal);
+            DrawAlertArrow(signal, false);
             SendSetupAlert(signal);
          }
       }
@@ -125,6 +128,13 @@ int BuildSymbolsList(string &symbols[])
 //+------------------------------------------------------------------+
 bool FindBullishBreakerPullback(const string symbol, SetupSignal &signal)
 {
+   int alert_index = InpAlertOnCurrentCandle ? 0 : 1;
+   return(FindBullishBreakerPullbackAt(symbol, alert_index, signal));
+}
+
+//+------------------------------------------------------------------+
+bool FindBullishBreakerPullbackAt(const string symbol, const int alert_index, SetupSignal &signal)
+{
    if(!SymbolSelect(symbol, true))
       return(false);
 
@@ -136,7 +146,6 @@ bool FindBullishBreakerPullback(const string symbol, SetupSignal &signal)
    if(copied < 20)
       return(false);
 
-   int alert_index = InpAlertOnCurrentCandle ? 0 : 1;
    if(alert_index >= copied)
       return(false);
 
@@ -209,6 +218,44 @@ bool FindBullishBreakerPullback(const string symbol, SetupSignal &signal)
    }
 
    return(false);
+}
+
+//+------------------------------------------------------------------+
+void DrawHistoricalArrows()
+{
+   if(!InpDrawArrowOnChart || !InpDrawHistoricalArrows)
+      return;
+
+   ClearHistoricalArrows();
+
+   int drawn = 0;
+   int start_index = InpAlertOnCurrentCandle ? 1 : 2;
+   int max_index = MathMax(start_index, InpLookbackBars - 20);
+
+   for(int alert_index = start_index; alert_index <= max_index && drawn < InpMaxHistoricalArrows; alert_index++)
+   {
+      SetupSignal signal;
+      if(FindBullishBreakerPullbackAt(_Symbol, alert_index, signal))
+      {
+         DrawAlertArrow(signal, true);
+         drawn++;
+      }
+   }
+
+   Print(StringFormat("SETUP_BBM15 Scanner EA: %d fleches historiques dessinees sur %s.", drawn, _Symbol));
+}
+
+//+------------------------------------------------------------------+
+void ClearHistoricalArrows()
+{
+   string prefix = "SETUP_BBM15_HIST_";
+
+   for(int i = ObjectsTotal(0, 0, -1) - 1; i >= 0; i--)
+   {
+      string name = ObjectName(0, i, 0, -1);
+      if(StringFind(name, prefix) == 0)
+         ObjectDelete(0, name);
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -304,7 +351,7 @@ void SendSetupAlert(const SetupSignal &signal)
 }
 
 //+------------------------------------------------------------------+
-void DrawAlertArrow(const SetupSignal &signal)
+void DrawAlertArrow(const SetupSignal &signal, const bool historical)
 {
    if(!InpDrawArrowOnChart)
       return;
@@ -312,7 +359,8 @@ void DrawAlertArrow(const SetupSignal &signal)
    if(signal.symbol != _Symbol)
       return;
 
-   string name = "SETUP_BBM15_ALERT_" + signal.symbol + "_" + IntegerToString((long)signal.alert_time) + "_" + IntegerToString((long)signal.break_time);
+   string prefix = historical ? "SETUP_BBM15_HIST_" : "SETUP_BBM15_ALERT_";
+   string name = prefix + signal.symbol + "_" + IntegerToString((long)signal.alert_time) + "_" + IntegerToString((long)signal.break_time);
    ObjectDelete(0, name);
 
    if(!ObjectCreate(0, name, OBJ_ARROW, 0, signal.alert_time, signal.alert_price))
@@ -326,7 +374,7 @@ void DrawAlertArrow(const SetupSignal &signal)
    string label = name + "_TEXT";
    ObjectDelete(0, label);
    ObjectCreate(0, label, OBJ_TEXT, 0, signal.alert_time, signal.alert_price);
-   ObjectSetString(0, label, OBJPROP_TEXT, "BB alert");
+   ObjectSetString(0, label, OBJPROP_TEXT, historical ? "BB hist" : "BB alert");
    ObjectSetInteger(0, label, OBJPROP_COLOR, InpArrowColor);
    ObjectSetInteger(0, label, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
 }
