@@ -3,7 +3,7 @@
 //| Scanner MT5 sans trading automatique base sur un indicateur DOB   |
 //+------------------------------------------------------------------+
 #property copyright "SETUP_BBM15"
-#property version   "1.101"
+#property version   "1.102"
 #property strict
 
 input string InpSymbols = "";                         // Actifs a scanner, separes par virgule. Vide = actif du graphique
@@ -20,9 +20,13 @@ input bool   InpPopupAlert = true;                    // Alerte popup MT5
 input bool   InpSoundAlert = true;                    // Alerte sonore
 input string InpAlertSound = "alert.wav";             // Fichier son MT5
 input bool   InpDrawArrowOnChart = true;              // Dessiner une fleche sur le graphique actif
+input bool   InpDrawDobZoneOnChart = true;            // Dessiner la zone DOB liee a chaque alerte
 input bool   InpDrawHistoricalArrows = true;          // Afficher les anciennes fleches sur le graphique actif
 input int    InpMaxHistoricalArrows = 50;             // Nombre maximum de fleches historiques
 input color  InpArrowColor = clrRed;                  // Couleur de la fleche d'alerte
+input color  InpBullishDobZoneColor = clrLimeGreen;   // Rectangle DOB bullish
+input color  InpBearishDobZoneColor = clrRed;         // Rectangle DOB bearish
+input int    InpDobZoneWidth = 2;                     // Epaisseur du rectangle DOB
 input int    InpArrowCode = 233;                      // Code Wingdings de la fleche
 input int    InpScanEverySeconds = 10;                // Frequence de scan
 
@@ -319,7 +323,7 @@ bool HasEarlierLevelTouch(const MqlRates &rates[], const int from_index, const i
 //+------------------------------------------------------------------+
 void DrawHistoricalArrows()
 {
-   if(!InpDrawArrowOnChart || !InpDrawHistoricalArrows)
+   if((!InpDrawArrowOnChart && !InpDrawDobZoneOnChart) || !InpDrawHistoricalArrows)
       return;
 
    ClearHistoricalArrows();
@@ -409,13 +413,15 @@ void SendSetupAlert(const SetupSignal &signal)
 //+------------------------------------------------------------------+
 void DrawAlertArrow(const SetupSignal &signal, const bool historical)
 {
-   if(!InpDrawArrowOnChart)
-      return;
-
    if(signal.symbol != _Symbol)
       return;
 
    string prefix = historical ? "SETUP_BBM15_DOB_HIST_" : "SETUP_BBM15_DOB_ALERT_";
+   DrawDobZone(signal, historical, prefix);
+
+   if(!InpDrawArrowOnChart)
+      return;
+
    string name = prefix + signal.symbol + "_" + IntegerToString((long)signal.alert_time) + "_" + IntegerToString((long)signal.break_time);
    ObjectDelete(0, name);
 
@@ -434,4 +440,37 @@ void DrawAlertArrow(const SetupSignal &signal, const bool historical)
    ObjectSetString(0, label, OBJPROP_TEXT, historical ? "DOB " + side + " hist" : "DOB " + side + " alert");
    ObjectSetInteger(0, label, OBJPROP_COLOR, InpArrowColor);
    ObjectSetInteger(0, label, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
+}
+
+//+------------------------------------------------------------------+
+void DrawDobZone(const SetupSignal &signal, const bool historical, const string prefix)
+{
+   if(!InpDrawDobZoneOnChart)
+      return;
+
+   string name = prefix
+                 + signal.symbol
+                 + "_"
+                 + IntegerToString((long)signal.ob_time)
+                 + "_"
+                 + IntegerToString((long)signal.alert_time)
+                 + "_ZONE";
+   ObjectDelete(0, name);
+
+   datetime right_time = signal.alert_time;
+   if(right_time <= signal.ob_time)
+      right_time = signal.ob_time + (datetime)PeriodSeconds(PERIOD_M15);
+
+   if(!ObjectCreate(0, name, OBJ_RECTANGLE, 0, signal.ob_time, signal.ob_high, right_time, signal.ob_low))
+      return;
+
+   color zone_color = signal.direction > 0 ? InpBullishDobZoneColor : InpBearishDobZoneColor;
+   ObjectSetInteger(0, name, OBJPROP_COLOR, zone_color);
+   ObjectSetInteger(0, name, OBJPROP_FILL, false);
+   ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH, InpDobZoneWidth);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTED, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
 }
